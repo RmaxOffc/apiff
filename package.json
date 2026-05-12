@@ -1,0 +1,17 @@
+{
+  "name": "apiff",
+  "version": "1.0.0",
+  "description": "FF API by Rmax",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
