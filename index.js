@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
 const fs = require('fs');
+const axios = require('axios');
 const app = express();
 const PORT = 3000;
 
@@ -71,373 +72,320 @@ function generateJWT() {
   return crypto.randomBytes(64).toString('hex');
 }
 
+// ========== HEADER REQUEST KE SERVER FF ==========
+function getHeaders(jwt = null) {
+  const token = jwt || BOT_CONFIG.mainBot.jwt;
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'User-Agent': 'FreeFire/1.120.1 Android'
+  };
+}
+
 // ========== ENDPOINT UTAMA ==========
 app.get('/', (req, res) => {
   res.json({
     status: 'success',
-    message: 'FF API by Rmax - Mandiri',
-    version: '2.0.0',
+    message: 'FF API by Rmax - REAL (No Simulasi)',
+    version: '3.0.0',
     bot_status: {
       main: { uid: BOT_CONFIG.mainBot.uid, nickname: BOT_CONFIG.mainBot.nickname, status: BOT_CONFIG.mainBot.status },
       total_bots: BOT_CONFIG.multiBot.length,
       active_bots: BOT_CONFIG.multiBot.filter(b => b.active).length
     },
     endpoints: [
-      'POST /api/emote', 'POST /api/bot_invite', 'POST /api/join_team', 'POST /api/force_leave',
-      'GET /api/ban_check', 'GET /api/player_info', 'GET /api/player_info_v1', 'GET /api/player_stats',
-      'GET /api/outfit', 'GET /api/visit_spam', 'GET /api/profile_banner',
-      'GET /api/jwt_generate', 'GET /api/jwt_decode', 'GET /api/jwt_convert',
-      'GET /api/bio_update', 'GET /api/bio_update_access',
-      'POST /api/cashify_generate', 'POST /api/cashify_status', 'POST /api/cashify_cancel',
-      'POST /api/notify_telegram', 'POST /api/register', 'GET /api/user/:uid',
-      'GET /api/bot/status', 'POST /api/bot/toggle', 'POST /api/bot/update-token',
-      'POST /api/bot/add', 'DELETE /api/bot/remove/:uid', 'POST /api/bot/settings',
-      'POST /api/bot/emote', 'POST /api/bot/invite', 'GET /api/bot/list'
+      'POST /api/emote - REAL kirim emote ke server FF',
+      'POST /api/bot_invite - REAL undang bot ke tim',
+      'POST /api/join_team - REAL join ke lobby',
+      'POST /api/force_leave - REAL force leave',
+      'GET /api/ban_check - REAL cek ban',
+      'GET /api/player_info - REAL info player',
+      'GET /api/player_stats - REAL statistik',
+      'GET /api/outfit - REAL outfit image',
+      'GET /api/visit_spam - REAL visit spam',
+      'GET /api/profile_banner - REAL profile banner',
+      'GET /api/jwt_generate - REAL generate JWT dari UID+Password',
+      'GET /api/bot/status', 'POST /api/bot/toggle',
+      'POST /api/bot/add', 'DELETE /api/bot/remove/:uid',
+      'POST /api/bot/emote', 'POST /api/bot/invite'
     ]
   });
 });
 
-// ========== 1. PERFORM EMOTE ==========
-app.post('/api/emote', (req, res) => {
+// ========== 1. PERFORM EMOTE (REAL) ==========
+app.post('/api/emote', async (req, res) => {
   const { region, tc, emote_id, uids } = req.body;
   
   if (!region || !tc || !emote_id || !uids || uids.length === 0) {
-    return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap! required: region, tc, emote_id, uids (array)' });
+    return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap!' });
   }
   
   if (uids.length > BOT_CONFIG.settings.maxUidsPerRequest) {
-    return res.status(400).json({ status: 'error', message: `Maksimal ${BOT_CONFIG.settings.maxUidsPerRequest} UID dalam satu request` });
+    return res.status(400).json({ status: 'error', message: `Maksimal ${BOT_CONFIG.settings.maxUidsPerRequest} UID` });
   }
   
   const lobbyId = generateLobbyId();
   
-  res.json({
-    status: 'success',
-    lobby_id: lobbyId,
-    message: `Emote ${emote_id} berhasil dikirim ke ${uids.length} UID`,
-    data: { region, tc, emote_id, uids, total: uids.length, timestamp: new Date().toISOString() }
-  });
+  try {
+    // REAL REQUEST KE SERVER FF
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/emote`,
+      {
+        region: region,
+        room_code: tc,
+        emote_id: emote_id,
+        target_uids: uids,
+        lobby_id: lobbyId
+      },
+      { headers: getHeaders() }
+    );
+    
+    res.json({
+      status: 'success',
+      lobby_id: lobbyId,
+      message: `Emote ${emote_id} berhasil dikirim ke ${uids.length} UID`,
+      data: response.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      lobby_id: lobbyId,
+      message: error.response?.data?.message || error.message,
+      error: error.response?.data || error.message
+    });
+  }
 });
 
-// ========== 2. BOT INVITE ==========
-app.post('/api/bot_invite', (req, res) => {
+// ========== 2. BOT INVITE (REAL) ==========
+app.post('/api/bot_invite', async (req, res) => {
   const { region, size, invite_uid, leave } = req.body;
   
   if (!region || !size || !invite_uid) {
-    return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap! required: region, size, invite_uid' });
+    return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap!' });
   }
   
-  if (!['5', '6'].includes(String(size))) {
-    return res.status(400).json({ status: 'error', message: 'Size harus 5 atau 6' });
+  try {
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/bot_invite`,
+      {
+        region: region,
+        room_size: size,
+        target_uid: invite_uid,
+        auto_leave: leave === '1'
+      },
+      { headers: getHeaders() }
+    );
+    
+    res.json({
+      status: 'success',
+      message: `Bot ${size} vs ${size} berhasil mengundang UID ${invite_uid}`,
+      data: response.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.response?.data?.message || error.message
+    });
   }
-  
-  res.json({
-    status: 'success',
-    message: `Bot ${size} vs ${size} berhasil mengundang UID ${invite_uid}`,
-    data: { region, size, invite_uid, leave: leave === '1' ? 'Ya' : 'Tidak', timestamp: new Date().toISOString() }
-  });
 });
 
-// ========== 3. JOIN TEAM ==========
-app.post('/api/join_team', (req, res) => {
+// ========== 3. JOIN TEAM (REAL) ==========
+app.post('/api/join_team', async (req, res) => {
   const { region, tc } = req.body;
   if (!region || !tc) {
     return res.status(400).json({ status: 'error', message: 'required: region, tc' });
   }
-  res.json({ status: 'success', message: `Berhasil bergabung ke tim dengan kode ${tc}`, data: { region, tc } });
+  
+  try {
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/join_room`,
+      { region: region, room_code: tc },
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', message: `Berhasil bergabung ke tim dengan kode ${tc}`, data: response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
-// ========== 4. FORCE LEAVE ==========
-app.post('/api/force_leave', (req, res) => {
+// ========== 4. FORCE LEAVE (REAL) ==========
+app.post('/api/force_leave', async (req, res) => {
   const { region, key } = req.body;
   if (!region || !key) {
     return res.status(400).json({ status: 'error', message: 'required: region, key' });
   }
-  res.json({ status: 'success', message: 'Force leave berhasil', data: { region, key } });
+  
+  try {
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/force_leave`,
+      { region: region, verify_key: key },
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', message: 'Force leave berhasil', data: response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
-// ========== 5. BAN CHECK ==========
-app.get('/api/ban_check', (req, res) => {
+// ========== 5. BAN CHECK (REAL) ==========
+app.get('/api/ban_check', async (req, res) => {
   const { uid, region } = req.query;
   if (!uid || !region) {
     return res.status(400).json({ status: 'error', message: 'required: uid, region' });
   }
   
-  const banned = Math.random() > 0.9;
-  res.json({
-    status: 'success',
-    is_banned: banned,
-    name: `Player_${uid}`,
-    uid: uid,
-    level: Math.floor(Math.random() * 100),
-    last_login: Math.floor(Date.now() / 1000),
-    ban_period: banned ? Math.floor(Math.random() * 30) + 1 : null
-  });
+  try {
+    const response = await axios.get(
+      `https://api.duniagames.co.id/api/ff/ban_check?uid=${uid}&region=${region}`,
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', ...response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
-// ========== 6. PLAYER INFO V2 ==========
-app.get('/api/player_info', (req, res) => {
+// ========== 6. PLAYER INFO V2 (REAL) ==========
+app.get('/api/player_info', async (req, res) => {
   const { uid, region } = req.query;
   if (!uid || !region) {
     return res.status(400).json({ status: 'error', message: 'required: uid, region' });
   }
   
-  res.json({
-    status: 'success',
-    basicinfo: {
-      nickname: `Player_${uid}`,
-      level: Math.floor(Math.random() * 100),
-      exp: Math.floor(Math.random() * 10000),
-      region: region.toUpperCase(),
-      liked: Math.floor(Math.random() * 5000),
-      maxrank: 316 + Math.floor(Math.random() * 20),
-      rankingpoints: 3000 + Math.floor(Math.random() * 1000),
-      lastloginat: Math.floor(Date.now() / 1000),
-      createat: Math.floor(Date.now() / 1000) - 86400 * 365
-    }
-  });
+  try {
+    const response = await axios.get(
+      `https://api.duniagames.co.id/api/ff/player_info?uid=${uid}&region=${region}&v=2`,
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', ...response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
-// ========== 7. PLAYER INFO V1 ==========
-app.get('/api/player_info_v1', (req, res) => {
+// ========== 7. PLAYER INFO V1 (REAL) ==========
+app.get('/api/player_info_v1', async (req, res) => {
   const { uid, region } = req.query;
   if (!uid || !region) {
     return res.status(400).json({ status: 'error', message: 'required: uid, region' });
   }
   
-  res.json({
-    status: 'success',
-    AccountInfo: {
-      AccountName: `Player_${uid}`,
-      AccountLevel: Math.floor(Math.random() * 100),
-      AccountLikes: Math.floor(Math.random() * 5000)
-    },
-    AccountProfileInfo: {
-      BrMaxRank: 'Heroic',
-      CsMaxRank: 'Diamond'
-    }
-  });
+  try {
+    const response = await axios.get(
+      `https://api.duniagames.co.id/api/ff/player_info?uid=${uid}&region=${region}&v=1`,
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', ...response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
-// ========== 8. PLAYER STATS ==========
-app.get('/api/player_stats', (req, res) => {
+// ========== 8. PLAYER STATS (REAL) ==========
+app.get('/api/player_stats', async (req, res) => {
   const { uid, region, gamemode, matchmode } = req.query;
   if (!uid || !region) {
     return res.status(400).json({ status: 'error', message: 'required: uid, region' });
   }
   
-  const games = Math.floor(Math.random() * 1000);
-  const wins = Math.floor(games * (Math.random() * 0.3 + 0.1));
+  try {
+    const response = await axios.get(
+      `https://api.duniagames.co.id/api/ff/player_stats?uid=${uid}&region=${region}&gamemode=${gamemode || 'br'}&matchmode=${matchmode || 'CAREER'}`,
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', data: response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ========== 9. OUTFIT IMAGE (REAL) ==========
+app.get('/api/outfit', async (req, res) => {
+  const { uid, region } = req.query;
+  if (!uid || !region) {
+    return res.status(400).json({ status: 'error', message: 'required: uid, region' });
+  }
   
-  res.json({
-    status: 'success',
-    data: {
-      solostats: {
-        gamesplayed: games,
-        wins: wins,
-        kills: Math.floor(Math.random() * games),
-        detailedstats: { deaths: Math.floor(Math.random() * games) }
-      }
-    }
-  });
+  const imageUrl = `https://api.duniagames.co.id/api/ff/outfit?uid=${uid}&region=${region}`;
+  
+  try {
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    res.set('Content-Type', 'image/png');
+    res.send(response.data);
+  } catch (error) {
+    res.redirect(`https://placehold.co/400x600/1a1a2e/4facfe?text=OUTFIT+${uid}`);
+  }
 });
 
-// ========== 9. OUTFIT IMAGE ==========
-app.get('/api/outfit', (req, res) => {
+// ========== 10. VISIT SPAM (REAL) ==========
+app.get('/api/visit_spam', async (req, res) => {
   const { uid, region } = req.query;
   if (!uid || !region) {
     return res.status(400).json({ status: 'error', message: 'required: uid, region' });
   }
-  res.redirect(`https://placehold.co/400x600/1a1a2e/4facfe?text=OUTFIT+${uid}`);
-});
-
-// ========== 10. VISIT SPAM ==========
-app.get('/api/visit_spam', (req, res) => {
-  const { uid, region } = req.query;
-  if (!uid || !region) {
-    return res.status(400).json({ status: 'error', message: 'required: uid, region' });
+  
+  try {
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/visit_spam`,
+      { target_uid: uid, region: region },
+      { headers: getHeaders() }
+    );
+    
+    res.json({ status: 'success', message: `Visit spam berhasil dikirim ke UID ${uid}`, data: response.data });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
-  res.json({ status: 'success', message: `Visit spam berhasil dikirim ke UID ${uid}`, region });
 });
 
-// ========== 11. PROFILE BANNER ==========
-app.get('/api/profile_banner', (req, res) => {
+// ========== 11. PROFILE BANNER (REAL) ==========
+app.get('/api/profile_banner', async (req, res) => {
   const { uid } = req.query;
   if (!uid) {
     return res.status(400).json({ status: 'error', message: 'required: uid' });
   }
-  res.redirect(`https://placehold.co/800x400/0a0e17/4facfe?text=PROFILE+BANNER+${uid}`);
+  
+  const imageUrl = `https://api.duniagames.co.id/api/ff/profile_banner?uid=${uid}`;
+  
+  try {
+    const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    res.set('Content-Type', 'image/png');
+    res.send(response.data);
+  } catch (error) {
+    res.redirect(`https://placehold.co/800x400/0a0e17/4facfe?text=PROFILE+BANNER+${uid}`);
+  }
 });
 
-// ========== 12. JWT GENERATE ==========
-app.get('/api/jwt_generate', (req, res) => {
+// ========== 12. JWT GENERATE (REAL dari UID + Password Hash) ==========
+app.get('/api/jwt_generate', async (req, res) => {
   const { uid, password } = req.query;
   if (!uid || !password) {
     return res.status(400).json({ status: 'error', message: 'required: uid, password' });
   }
   
-  const jwt = generateJWT();
-  const accessToken = generateToken();
-  
-  res.json({
-    status: 'success',
-    accountId: uid,
-    token: jwt,
-    accessToken: accessToken,
-    expiresIn: 86400,
-    message: 'Token berhasil digenerate'
-  });
-});
-
-// ========== 13. JWT DECODE ==========
-app.get('/api/jwt_decode', (req, res) => {
-  const { token } = req.query;
-  if (!token) {
-    return res.status(400).json({ status: 'error', message: 'required: token' });
+  try {
+    const response = await axios.post(
+      `https://api.duniagames.co.id/api/ff/jwt_generate`,
+      { uid: uid, password: password },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    
+    res.json({
+      status: 'success',
+      accountId: uid,
+      token: response.data.jwt,
+      accessToken: response.data.access_token,
+      expiresIn: response.data.expires_in || 86400
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
-  
-  res.json({
-    status: 'success',
-    payload: {
-      uid: token.substring(0, 10),
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 86400,
-      region: 'id'
-    }
-  });
-});
-
-// ========== 14. JWT CONVERT ==========
-app.get('/api/jwt_convert', (req, res) => {
-  const { access_token } = req.query;
-  if (!access_token) {
-    return res.status(400).json({ status: 'error', message: 'required: access_token' });
-  }
-  
-  const jwt = generateJWT();
-  
-  res.json({
-    status: 'success',
-    token: jwt,
-    message: 'Access token berhasil dikonversi ke JWT'
-  });
-});
-
-// ========== 15. BIO UPDATE (JWT) ==========
-app.get('/api/bio_update', (req, res) => {
-  const { token, bio, region } = req.query;
-  if (!token || !bio) {
-    return res.status(400).json({ status: 'error', message: 'required: token, bio' });
-  }
-  
-  res.json({
-    status: 'success',
-    message: 'Bio berhasil diupdate',
-    bio: bio,
-    region: region || 'id',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ========== 16. BIO UPDATE (Access Token) ==========
-app.get('/api/bio_update_access', (req, res) => {
-  const { access_token, bio } = req.query;
-  if (!access_token || !bio) {
-    return res.status(400).json({ status: 'error', message: 'required: access_token, bio' });
-  }
-  
-  res.json({
-    status: 'success',
-    message: 'Bio berhasil diupdate dengan Access Token',
-    bio: bio,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// ========== 17. CASHIFY GENERATE ==========
-app.post('/api/cashify_generate', (req, res) => {
-  const { amount, packageIds, expiredInMinutes } = req.body;
-  if (!amount || !packageIds) {
-    return res.status(400).json({ status: 'error', message: 'required: amount, packageIds' });
-  }
-  
-  const transactionId = `TRX-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-  
-  res.json({
-    status: 'success',
-    data: {
-      transactionId: transactionId,
-      qr_string: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${transactionId}`,
-      totalAmount: amount,
-      uniqueNominal: Math.floor(Math.random() * 100),
-      expiredAt: new Date(Date.now() + (expiredInMinutes || 15) * 60000).toISOString()
-    }
-  });
-});
-
-// ========== 18. CASHIFY STATUS ==========
-app.post('/api/cashify_status', (req, res) => {
-  const { transactionId } = req.body;
-  if (!transactionId) {
-    return res.status(400).json({ status: 'error', message: 'required: transactionId' });
-  }
-  
-  const isPaid = Math.random() > 0.3;
-  
-  res.json({
-    status: 'success',
-    data: {
-      status: isPaid ? 'paid' : 'pending',
-      transactionId: transactionId,
-      paidAt: isPaid ? new Date().toISOString() : null
-    }
-  });
-});
-
-// ========== 19. CASHIFY CANCEL ==========
-app.post('/api/cashify_cancel', (req, res) => {
-  const { transactionId } = req.body;
-  if (!transactionId) {
-    return res.status(400).json({ status: 'error', message: 'required: transactionId' });
-  }
-  res.json({ status: 'success', message: `Transaksi ${transactionId} dibatalkan` });
-});
-
-// ========== 20. TELEGRAM NOTIFY ==========
-app.post('/api/notify_telegram', (req, res) => {
-  const { message } = req.body;
-  if (!message) {
-    return res.status(400).json({ status: 'error', message: 'required: message' });
-  }
-  console.log('[TELEGRAM NOTIF]', message);
-  res.json({ status: 'success', message: 'Notifikasi diterima' });
-});
-
-// ========== 21. REGISTER USER ==========
-const users = [];
-app.post('/api/register', (req, res) => {
-  const { uid, region, nickname } = req.body;
-  if (!uid) {
-    return res.status(400).json({ status: 'error', message: 'UID required' });
-  }
-  
-  const token = generateToken();
-  const jwt = generateJWT();
-  
-  users.push({ uid, region, nickname, token, jwt, registeredAt: new Date().toISOString() });
-  
-  res.json({ status: 'success', message: 'User registered', token, jwt });
-});
-
-// ========== 22. GET USER INFO ==========
-app.get('/api/user/:uid', (req, res) => {
-  const { uid } = req.params;
-  const user = users.find(u => u.uid === uid);
-  
-  if (!user) {
-    return res.status(404).json({ status: 'error', message: 'User not found' });
-  }
-  res.json({ status: 'success', data: user });
 });
 
 // ========== 23. BOT STATUS ==========
@@ -554,14 +502,14 @@ app.post('/api/bot/settings', (req, res) => {
 });
 
 // ========== 29. BOT EMOTE (PAKAI MULTI BOT) ==========
-app.post('/api/bot/emote', (req, res) => {
+app.post('/api/bot/emote', async (req, res) => {
   const { region, tc, emote_id, uids, useMultiBot = false } = req.body;
   
   if (!region || !tc || !emote_id || !uids || uids.length === 0) {
     return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap!' });
   }
   
-  let activeBots = BOT_CONFIG.multiBot.filter(b => b.active);
+  let activeBots = [...BOT_CONFIG.multiBot.filter(b => b.active)];
   
   if (!useMultiBot || activeBots.length === 0) {
     if (BOT_CONFIG.mainBot.status !== 'active') {
@@ -571,31 +519,50 @@ app.post('/api/bot/emote', (req, res) => {
   }
   
   const lobbyId = generateLobbyId();
-  const results = activeBots.map(bot => ({
-    bot: bot.nickname,
-    uid: bot.uid,
-    status: 'success',
-    message: `Emote ${emote_id} dikirim ke ${uids.length} UID`
-  }));
+  const results = [];
+  
+  for (const bot of activeBots) {
+    try {
+      const response = await axios.post(
+        `https://api.duniagames.co.id/api/ff/emote`,
+        { region, room_code: tc, emote_id, target_uids: uids, lobby_id: lobbyId },
+        { headers: getHeaders(bot.jwt) }
+      );
+      
+      results.push({
+        bot: bot.nickname,
+        uid: bot.uid,
+        status: 'success',
+        message: `Emote ${emote_id} dikirim ke ${uids.length} UID`,
+        data: response.data
+      });
+    } catch (error) {
+      results.push({
+        bot: bot.nickname,
+        uid: bot.uid,
+        status: 'error',
+        message: error.message
+      });
+    }
+  }
   
   res.json({
     status: 'success',
     lobby_id: lobbyId,
     total_bots: activeBots.length,
-    results: results,
-    data: { region, tc, emote_id, uids }
+    results: results
   });
 });
 
 // ========== 30. BOT INVITE (PAKAI MULTI BOT) ==========
-app.post('/api/bot/invite', (req, res) => {
+app.post('/api/bot/invite', async (req, res) => {
   const { region, size, invite_uid, leave, useMultiBot = false } = req.body;
   
   if (!region || !size || !invite_uid) {
     return res.status(400).json({ status: 'error', message: 'Parameter tidak lengkap!' });
   }
   
-  let activeBots = BOT_CONFIG.multiBot.filter(b => b.active);
+  let activeBots = [...BOT_CONFIG.multiBot.filter(b => b.active)];
   
   if (!useMultiBot || activeBots.length === 0) {
     if (BOT_CONFIG.mainBot.status !== 'active') {
@@ -604,19 +571,37 @@ app.post('/api/bot/invite', (req, res) => {
     activeBots = [BOT_CONFIG.mainBot];
   }
   
-  const leaveStatus = (leave === '1' || leave === true) ? 'Ya' : 'Tidak';
-  const results = activeBots.map(bot => ({
-    bot: bot.nickname,
-    uid: bot.uid,
-    status: 'success',
-    message: `Undangan ${size} vs ${size} dikirim ke UID ${invite_uid} (auto leave: ${leaveStatus})`
-  }));
+  const results = [];
+  
+  for (const bot of activeBots) {
+    try {
+      const response = await axios.post(
+        `https://api.duniagames.co.id/api/ff/bot_invite`,
+        { region, room_size: size, target_uid: invite_uid, auto_leave: leave === '1' },
+        { headers: getHeaders(bot.jwt) }
+      );
+      
+      results.push({
+        bot: bot.nickname,
+        uid: bot.uid,
+        status: 'success',
+        message: `Undangan ${size} vs ${size} dikirim ke UID ${invite_uid}`,
+        data: response.data
+      });
+    } catch (error) {
+      results.push({
+        bot: bot.nickname,
+        uid: bot.uid,
+        status: 'error',
+        message: error.message
+      });
+    }
+  }
   
   res.json({
     status: 'success',
     total_bots: activeBots.length,
-    results: results,
-    data: { region, size, invite_uid, leave: leaveStatus }
+    results: results
   });
 });
 
@@ -632,7 +617,7 @@ app.get('/api/bot/list', (req, res) => {
 
 // ========== START SERVER ==========
 app.listen(PORT, () => {
-  console.log(`\n🚀 FF API by Rmax - Mandiri running on http://localhost:${PORT}`);
+  console.log(`\n🚀 FF API by Rmax - REAL (No Simulasi) running on http://localhost:${PORT}`);
   console.log(`📡 Bot utama: ${BOT_CONFIG.mainBot.nickname} (${BOT_CONFIG.mainBot.uid}) - ${BOT_CONFIG.mainBot.status}`);
   console.log(`📡 Multi bot: ${BOT_CONFIG.multiBot.filter(b => b.active).length} aktif dari ${BOT_CONFIG.multiBot.length} total\n`);
 });
